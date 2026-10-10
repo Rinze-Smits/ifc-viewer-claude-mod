@@ -43,6 +43,8 @@ const viewer = atom({ plugin: 'ifc-viewer', key: 'viewer' } as const, INITIAL)
 
 let home = '.'
 let pluginRoot = '.'
+/** from plugin.json, read at session start */
+let version = '?'
 const cacheRoot = () => `${home}/.cache/ifc-viewer`
 /** IfcLite's WASM engine ships inside the mod (MPL-2.0, see vendor/ifc-lite-wasm/LICENSE) */
 const wasmDir = () => `${pluginRoot}/vendor/ifc-lite-wasm`
@@ -391,6 +393,11 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     home = ((await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE')) ?? home).replace(/[\\/]+$/, '')
     pluginRoot = $.plugin.root
+    try {
+      version = (JSON.parse(await $.fs.read(`${pluginRoot}/.claude-plugin/plugin.json`)) as { version?: string }).version ?? '?'
+    } catch {
+      version = '?'
+    }
     await $.command.register({
       name: 'ifc',
       description: 'Show the IFC viewer; /ifc <path> opens a model, /ifc clear clears the highlight',
@@ -429,7 +436,7 @@ export const register: Register = on => {
         return { text: `Could not open ${arg}: ${(err as Error).message}`, exitCode: 1 }
       }
     }
-    return { text: `IFC viewer: ${where}` }
+    return { text: `IFC viewer v${version}: ${where}` }
   })
 
   on('tool.call', { tool: 'mcp__ifc-viewer__ifc' }, async ($, e) => {
