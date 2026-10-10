@@ -4,7 +4,7 @@ A Claude Code mod that shows IFC models in a pane beside the chat and lets you
 highlight the elements you're working on. Claude sees your highlights with your
 next message and can highlight, find and frame elements itself.
 
-- 3D view (orbit, zoom, pan, Iso/Top/Front/Back/Left/Right, Fit) drawn as SVG
+- 3D view (orbit, zoom, pan, Iso/Top/Front/Back/Left/Right, Fit): SVG on the desktop, a kitty-graphics picture in the terminal
 - storey filter, spaces, X-ray and isolate
 - search by name, class, GUID or `#id`; numbered highlights in the view and list
 - `/ifc` opens the pane, `/ifc <path>` opens a model, `/ifc clear` clears the highlight
@@ -30,7 +30,8 @@ In a terminal, start `claude` and type:
 Answer `y` to add the marketplace, then choose the **user** scope so it loads in
 every session on this computer, including the desktop app's Code tab.
 
-The 3D view draws on the desktop surface; in a terminal the pane shows the
+The 3D view draws as SVG on the desktop surface, and as a picture in terminals
+with kitty graphics (kitty, Ghostty, WezTerm). Elsewhere the pane shows the
 lists and controls without the 3D view.
 
 ## Use

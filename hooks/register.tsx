@@ -4,7 +4,8 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Camera, ModelEntry, ViewerState } from '../types'
 import { buildModel, describe, find, label, storeyIndex, storeyName } from './model'
 import type { Meta, Model, RawElement, Selector } from './model'
-import { fitCamera, renderSvg } from './render'
+import { encodePng, rasterize, toBase64 } from './raster'
+import { fitCamera, H as VIEW_H, renderSvg, W as VIEW_W } from './render'
 import type { RenderResult } from './render'
 
 type $ = EngineInterface
@@ -50,6 +51,8 @@ const modelDir = (key: string) => `${cacheRoot()}/models/${key}`
 const models = new Map<string, Model>()
 const loading = new Map<string, Promise<Model>>()
 let lastRender: { key: string; result: RenderResult } | null = null
+type Picture = { source: { png: string } | { rgba: string; width: number; height: number }; drawn: number }
+let lastPicture: { key: string; picture: Picture } | null = null
 /** where the pane was last drawn, for /ifc to report */
 let diag: { surface: string; placement: string; bodyColumns: number; renders: number; error?: string; svgChars?: number } | null = null
 
@@ -408,7 +411,7 @@ export const register: Register = on => {
     const placed = await $.ui.open({ id: PANE, title: 'IFC viewer', focus: true })
     const pane = (await $.ui.panes()).find(p => p.id === PANE)
     const drawn = diag
-      ? `last drawn on ${diag.surface} (${diag.placement}, ${diag.bodyColumns} columns, ${diag.renders} draws${diag.svgChars ? `, 3D view ${diag.svgChars} chars` : ', no 3D view'})${diag.error ? `; drawing failed: ${diag.error}` : ''}`
+      ? `last drawn on ${diag.surface} (${diag.placement}, ${diag.bodyColumns} columns, ${diag.renders} draws${diag.svgChars ? `, SVG view ${diag.svgChars} chars` : diag.surface === 'terminal' ? `, image view${lastPicture ? ` (${'png' in lastPicture.picture.source ? 'PNG' : 'RGBA'})` : ''}` : ', no 3D view'})${diag.error ? `; drawing failed: ${diag.error}` : ''}`
       : 'never drawn yet'
     const where = placed.isPlaced
       ? `Pane placed; shown now: ${pane?.isShown ?? '?'}; ${drawn}.`
@@ -464,6 +467,7 @@ export const register: Register = on => {
     const Input = hasFields ? table.Input : undefined
     const Select = hasFields ? table.Select : undefined
     const Svg = 'Svg' in table ? table.Svg : undefined
+    const Image = 'Image' in table ? table.Image : undefined
 
     const openRow = Input ? (
       <Box flexDirection="column" gap={0}>
@@ -514,6 +518,32 @@ export const register: Register = on => {
       result = lastRender.result
       diag = { ...diag!, svgChars: result.svg.length }
     }
+    // the terminal: a picture through the Image element (kitty graphics), sized
+    // to the pane in cells; cells are about twice as tall as wide
+    let picture: Picture | undefined
+    let imgCols = 0, imgRows = 0
+    if (!Svg && Image) {
+      imgCols = Math.max(20, Math.min(255, e.props.bodyColumns))
+      imgRows = Math.max(6, Math.round((imgCols * VIEW_H) / VIEW_W / 2.1))
+      const roomRows = e.props.scroll?.bodyRows
+      if (roomRows && imgRows > roomRows - 4) {
+        imgRows = Math.max(6, roomRows - 4)
+        imgCols = Math.max(20, Math.min(imgCols, Math.round((imgRows * 2.1 * VIEW_W) / VIEW_H)))
+      }
+      const px = Math.min(1280, imgCols * 10)
+      const key = `${renderKey}|${px}`
+      if (lastPicture?.key !== key) {
+        const img = rasterize(model, st.cam, st.opts, hl, st.highlights, px)
+        let png: Uint8Array | null = null
+        try { png = encodePng(img) } catch { png = null }
+        const source = png
+          ? { png: toBase64(png) }
+          : { rgba: toBase64(img.rgba), width: img.width, height: img.height }
+        lastPicture = { key, picture: { source, drawn: img.drawn } }
+      }
+      picture = lastPicture.picture
+      diag = { ...diag!, svgChars: undefined }
+    }
 
     const m = model
     const toggle = (labelText: string, isOn: boolean, key: string, flip: () => void) => (
@@ -556,8 +586,16 @@ export const register: Register = on => {
 
         {Svg && result ? (
           <Svg source={result.svg} alt={`${entry.name}, ${result.drawn} faces drawn${st.highlights.length ? `, ${st.highlights.length} highlighted` : ''}`} />
+        ) : Image && picture ? (
+          <Image
+            key="view"
+            source={picture.source}
+            columns={imgCols}
+            rows={imgRows}
+            alt={`3D view of ${entry.name} (needs a terminal with kitty graphics, e.g. kitty or Ghostty)`}
+          />
         ) : (
-          <Text dimColor>The 3D view draws in the Claude app; the lists below work here too.</Text>
+          <Text dimColor>This surface draws no 3D view; the lists below work here too.</Text>
         )}
 
         <Box flexDirection="row" flexWrap="wrap" gap={1} alignItems="center">

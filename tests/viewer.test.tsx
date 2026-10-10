@@ -4,6 +4,7 @@ import type { ViewOptions } from '../types'
 import { buildModel, find } from '../hooks/model'
 import type { Meta, RawElement } from '../hooks/model'
 import { fitCamera, renderSvg } from '../hooks/render'
+import { encodePng, rasterize, toBase64 } from '../hooks/raster'
 
 /** n boxes on a grid, as the converter would write them: six quads each */
 function boxes(n: number): RawElement[] {
@@ -94,4 +95,19 @@ test('the pane without a model invites opening one, on desktop and terminal', as
     expect(await ui.find({ type: 'Text', text: /No model open/ })).toBeDefined()
     await ui.unmount()
   }
+})
+
+test('the terminal picture: rasterised and PNG-encoded within the hook budget', async () => {
+  const m = model(3_000)
+  const cam = fitCamera(m, { yaw: -55, pitch: 28, scale: 1, target: [0, 0, 0] }, OPTS, new Set())
+  const t0 = Date.now()
+  const img = rasterize(m, cam, OPTS, new Set([100]), [100], 1280)
+  const t1 = Date.now()
+  const png = encodePng(img)
+  const t2 = Date.now()
+  console.log(`terminal picture: raster ${t1 - t0} ms, png ${t2 - t1} ms, ${Math.round(png.length / 1024)} KB for ${img.width}x${img.height}`)
+  expect([...png.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
+  expect(png.length).toBeLessThan(img.rgba.length / 4)
+  expect(toBase64(png).length).toBeGreaterThan(0)
+  expect(t2 - t0).toBeLessThan(6_000)
 })
