@@ -470,11 +470,14 @@ export const register: Register = on => {
       void loadModel($, key).then(() => update($, viewer, s => ({ ...s, loadedTick: s.loadedTick + 1 })), () => undefined)
     }
     const recent = ((await $.store.get('recent')) as string[] | undefined) ?? []
-    const hasFields = 'Input' in table && 'Select' in table
+    // every table is completed with every element name (a missing one draws
+    // an empty fragment), so pick by the surface, never by what the table holds
+    const surface = e.surface
+    const hasFields = surface !== 'mobile' && 'Input' in table && 'Select' in table
     const Input = hasFields ? table.Input : undefined
     const Select = hasFields ? table.Select : undefined
-    const Svg = 'Svg' in table ? table.Svg : undefined
-    const Image = 'Image' in table ? table.Image : undefined
+    const Svg = surface !== 'terminal' && 'Svg' in table ? table.Svg : undefined
+    const Image = surface === 'terminal' && 'Image' in table ? table.Image : undefined
 
     const openRow = Input ? (
       <Box flexDirection="column" gap={0}>
