@@ -1,0 +1,13 @@
+{
+  "name": "ifc-viewer",
+  "owner": {
+    "name": "Rinze Smits"
+  },
+  "plugins": [
+    {
+      "name": "ifc-viewer",
+      "source": "./"
+    }
+  ],
+  "description": "IFC model viewer pane with element highlighting for Claude Code"
+}
