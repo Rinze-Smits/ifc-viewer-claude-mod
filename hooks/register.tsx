@@ -521,10 +521,12 @@ export const register: Register = on => {
     }
 
     const hl = new Set(st.highlights)
-    const renderKey = JSON.stringify([st.active, st.cam, st.opts, st.highlights, st.loadedTick])
+    // a camera not fitted yet (scale 0) would draw an empty frame: fit it here
+    const cam = st.cam.scale > 0 ? st.cam : fitCamera(model, { ...st.cam, ...ISO }, st.opts, hl)
+    const renderKey = JSON.stringify([st.active, cam, st.opts, st.highlights, st.loadedTick])
     let result: RenderResult | undefined
     if (Svg) {
-      if (lastRender?.key !== renderKey) lastRender = { key: renderKey, result: renderSvg(model, st.cam, st.opts, hl, st.highlights) }
+      if (lastRender?.key !== renderKey) lastRender = { key: renderKey, result: renderSvg(model, cam, st.opts, hl, st.highlights) }
       result = lastRender.result
       diag = { ...diag!, svgChars: result.svg.length }
     }
@@ -535,15 +537,18 @@ export const register: Register = on => {
     if (!Svg && Image) {
       imgCols = Math.max(20, Math.min(255, e.props.bodyColumns))
       imgRows = Math.max(6, Math.round((imgCols * VIEW_H) / VIEW_W / 2.1))
-      const roomRows = e.props.scroll?.bodyRows
-      if (roomRows && imgRows > roomRows - 4) {
-        imgRows = Math.max(6, roomRows - 4)
+      // sized from the pane's width and the whole screen's height only, which
+      // hold still while the pane settles: an Image redrawn at another size can
+      // leave the terminal showing the old one
+      const maxRows = Math.max(8, Math.floor((e.viewport?.rows ?? 48) * 0.55))
+      if (imgRows > maxRows) {
+        imgRows = maxRows
         imgCols = Math.max(20, Math.min(imgCols, Math.round((imgRows * 2.1 * VIEW_W) / VIEW_H)))
       }
       const px = Math.min(1280, imgCols * 10)
       const key = `${renderKey}|${px}`
       if (lastPicture?.key !== key) {
-        const img = rasterize(model, st.cam, st.opts, hl, st.highlights, px)
+        const img = rasterize(model, cam, st.opts, hl, st.highlights, px)
         let png: Uint8Array | null = null
         try { png = encodePng(img) } catch { png = null }
         const source = png

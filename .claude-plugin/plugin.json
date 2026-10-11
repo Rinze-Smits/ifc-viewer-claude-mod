@@ -1,6 +1,6 @@
 {
   "name": "ifc-viewer",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "author": { "name": "Rinze Smits" },
   "description": "View IFC models in a pane beside the chat (IfcLite geometry, SVG view) and highlight the elements you're working on",
   "types": "./types/index.d.ts"
